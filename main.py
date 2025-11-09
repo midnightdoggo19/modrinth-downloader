@@ -2,17 +2,20 @@ import json
 import os
 import requests
 
+url = "https://api.modrinth.com/v2/"
+config = "config.json"
 
+# gets the latest version of minecraft
 def getLatestVersion():
-    versions = requests.get("https://api.modrinth.com/v2/tag/game_version").json()
+    versions = requests.get(f"{url}tag/game_version").json()
     for version in versions:
         if version["major"]:
             return version["version"]
 
-
+# goes and gets the mods
 def md(id):
-    name = requests.get(f"https://api.modrinth.com/v2/project/{id}").json()["title"]
-    e = requests.get(f'https://api.modrinth.com/v2/project/{id}/version').json()
+    name = requests.get(f"{url}v2/project/{id}").json()["title"]
+    e = requests.get(f"{url}/project/{id}/version").json()
     thing = None
     for item in e:
         if versionWanted in item["game_versions"] and loaderWanted in item["loaders"]:
@@ -23,21 +26,19 @@ def md(id):
             break
     if thing is not None:
         with requests.get(thing["url"], stream=True) as r:
-            with open(f"{location}/{thing['filename']}", 'wb') as f:
+            with open(f"{location}/{thing["filename"]}", "wb") as f:
                 f.write(r.content)
-                print(thing['filename'])
+                print(thing["filename"])
     else:
-        print(f"cannot find {name} for version {versionWanted} or for loader {loaderWanted}")
-
+        print(f"Cannot find \"{name}\" for version {versionWanted} and loader \"{loaderWanted}\"")
 
 if __name__ == "__main__":
-    mainFile = input("config file: ")
-    with open(mainFile, "r") as r:
+    with open(config, "r") as r:
         config = json.load(r)
         modrinthIds = config["modrinth"]
-        loaderWanted = config.get("loader", "fabric")
+        loaderWanted = config.get("loader", "fabric").lower()
         versionWanted = config.get("version", getLatestVersion())
-        location = config.get("location", os.path.splitext(mainFile)[0])
+        location = config.get("location", "output")
         delete = config.get("delete", False)
 
     if not os.path.isdir(location):
