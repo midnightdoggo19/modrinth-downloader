@@ -1,0 +1,9 @@
+{
+  "version": "Minecraft version",
+  "loader": "Quilt, Fabric, Forge, etc",
+  "output": "outputFolder",
+  "modrinth": [
+    "slugs or mod names",
+    "comma separated"
+  ]
+}
