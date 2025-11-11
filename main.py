@@ -14,8 +14,8 @@ def getLatestVersion():
 
 # goes and gets the mods
 def md(id):
-    name = requests.get(f"{url}v2/project/{id}").json()["title"]
-    e = requests.get(f"{url}/project/{id}/version").json()
+    name = requests.get(f"{url}project/{id}").json()["title"]
+    e = requests.get(f"{url}project/{id}/version").json()
     thing = None
     for item in e:
         if versionWanted in item["game_versions"] and loaderWanted in item["loaders"]:
