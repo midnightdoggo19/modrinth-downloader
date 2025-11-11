@@ -13,22 +13,23 @@ def getLatestVersion():
             return version["version"]
 
 # goes and gets the mods
-def md(id):
+def download(id):
     name = requests.get(f"{url}project/{id}").json()["title"]
-    e = requests.get(f"{url}project/{id}/version").json()
-    thing = None
-    for item in e:
+    versions = requests.get(f"{url}project/{id}/version").json()
+    fileToGet = None
+
+    for item in versions:
         if versionWanted in item["game_versions"] and loaderWanted in item["loaders"]:
             for file in item["files"]:
                 if file["primary"]:
-                    thing = file
+                    fileToGet = file
                     break
             break
-    if thing is not None:
-        with requests.get(thing["url"], stream=True) as r:
-            with open(f"{location}/{thing["filename"]}", "wb") as f:
+    if fileToGet is not None:
+        with requests.get(fileToGet["url"], stream=True) as r:
+            with open(f"{location}/{fileToGet["filename"]}", "wb") as f:
                 f.write(r.content)
-                print(thing["filename"])
+                print(fileToGet["filename"])
     else:
         print(f"Cannot find \"{name}\" for version {versionWanted} and loader \"{loaderWanted}\"")
 
@@ -49,4 +50,4 @@ if __name__ == "__main__":
                 os.remove(f"{location}/{file}")
     for id in modrinthIds:
         if id is not None:
-            md(id)
+            download(id)
