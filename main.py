@@ -7,7 +7,10 @@ config = "config.json"
 
 # gets the latest version of minecraft
 def getLatestVersion():
-    versions = requests.get(f"{url}tag/game_version").json()
+    try:
+        versions = requests.get(f"{url}tag/game_version").json()
+    except:
+        print("Failed to get latest version!")
     for version in versions:
         if version["major"]:
             return version["version"]
@@ -34,13 +37,16 @@ def download(id):
         print(f"Cannot find \"{name}\" for version {versionWanted} and loader \"{loaderWanted}\"")
 
 if __name__ == "__main__":
-    with open(config, "r") as r:
-        config = json.load(r)
-        modrinthIds = config["modrinth"]
-        loaderWanted = config.get("loader", "fabric").lower()
-        versionWanted = config.get("version", getLatestVersion())
-        location = config.get("location", "output")
-        delete = config.get("delete", False)
+    try:
+        with open(config, "r") as r:
+            config = json.load(r)
+            modrinthIds = config["modrinth"]
+            loaderWanted = config.get("loader", "fabric").lower()
+            versionWanted = config.get("version", getLatestVersion())
+            location = config.get("location", "output")
+            delete = config.get("delete", False)
+    except:
+        print("We failed to get some values; is the config file correct?")
 
     if not os.path.isdir(location):
         os.mkdir(location)
@@ -50,4 +56,7 @@ if __name__ == "__main__":
                 os.remove(f"{location}/{file}")
     for id in modrinthIds:
         if id is not None:
-            download(id)
+            try:
+                download(id)
+            except:
+                print(f"Cannot find \"{id}\" for version {versionWanted} and loader \"{loaderWanted}\"")
