@@ -45,3 +45,7 @@ python main.py -v <minecraft_version> -l <loader> -c <your_collection_id>
                         Directory to download mods to. Default: "mods"
   -u, --update          Download and update existing mods. Default: false
 ```
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=aayushdutt/modrinth-collection-downloader&type=date&legend=top-left)](https://www.star-history.com/#aayushdutt/modrinth-collection-downloader&type=date&legend=top-left)
