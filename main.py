@@ -7,7 +7,6 @@ import sys
 from typing import Optional, Dict, List
 from urllib import request, error
 
-
 class ModrinthClient:
     """Client for interacting with the Modrinth API."""
 
@@ -131,6 +130,11 @@ def parse_args():
         action="store_false",
         help="Do not update existing mods",
     )
+    parser.add_argument(
+        "--include-mod-id",
+        default=True,
+        help="Include mod ID in filename (true/false). Default: true",
+    )
     args = parser.parse_args()
     
     # Prompt for missing required values (works even when piped via /dev/tty)
@@ -173,38 +177,76 @@ def validate_directory(directory: str) -> bool:
     return True
 
 
-def get_existing_mods(directory: str) -> Dict[str, Dict[str, str]]:
+def get_existing_mods(directory: str, include_mod_id: bool = True) -> Dict[str, Dict[str, str]]:
     """Get existing mods from the directory.
     
-    Returns a dictionary mapping mod_id to mod info dict.
-    Handles edge cases like files without extensions or unusual names.
+    Returns a dictionary that maps mod_id to the mod info dictionary.
+    When not including the mod ID in filenames, we use index.json to map mods to IDs.
     """
     if not os.path.exists(directory):
         return {}
     
     existing_mods: Dict[str, Dict[str, str]] = {}
+    metadata_file = os.path.join(directory, "index.json")
+    
+    # Load metadata if it exists
+    metadata = {}
+    if os.path.exists(metadata_file):
+        try:
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: Failed to read index.json: {e}")
+    
     try:
         for item in os.listdir(directory):
+            if item == "index.json":
+                continue
+            
             item_path = os.path.join(directory, item)
             # Only process files, skip directories
             if not os.path.isfile(item_path):
                 continue
             
-            # Extract mod_id from filename
-            # Format: filename.modid.ext or filename.modid
-            parts = item.rsplit(".", 2)
-            if len(parts) >= 2:
-                # Has at least one dot, mod_id should be second-to-last part
-                mod_id = parts[-2]
+            # First check metadata file
+            if item in metadata:
+                mod_id = metadata[item]
                 existing_mods[mod_id] = {"id": mod_id, "filename": item}
-            else:
-                # No extension, skip or handle differently
-                # For now, we'll skip files without proper format
-                continue
+            elif include_mod_id:
+                # Fallback: extract mod_id from filename
+                # Format: filename.modid.ext
+                parts = item.rsplit(".", 2)
+                if len(parts) >= 2:
+                    mod_id = parts[-2]
+                    existing_mods[mod_id] = {"id": mod_id, "filename": item}
     except OSError as e:
         print(f"Warning: Failed to read directory '{directory}': {e}")
     
     return existing_mods
+
+
+def save_mod_metadata(directory: str, filename: str, mod_id: str) -> None:
+    """Save mod ID to index.json"""
+    metadata_file = os.path.join(directory, "index.json")
+    
+    # Load existing metadata
+    metadata = {}
+    if os.path.exists(metadata_file):
+        try:
+            with open(metadata_file, 'r') as f:
+                metadata = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: Failed to read index.json: {e}")
+    
+    # Update with new entry
+    metadata[filename] = mod_id
+    
+    # Save metadata
+    try:
+        with open(metadata_file, 'w') as f:
+            json.dump(metadata, f, indent=2)
+    except OSError as e:
+        print(f"Warning: Failed to write index.json: {e}")
 
 
 def get_mod_name(modrinth_client: ModrinthClient, mod_id: str) -> str:
@@ -249,6 +291,7 @@ def download_mod(
     processed_mods: Optional[set] = None,
     is_dependency: bool = False,
     parent_mod_id: Optional[str] = None,
+    include_mod_id: bool = True,
 ) -> None:
     """Download or update a mod.
     
@@ -259,6 +302,7 @@ def download_mod(
         processed_mods: Set of mod IDs that have already been processed (to avoid circular dependencies).
         is_dependency: Whether this mod is being downloaded as a dependency.
         parent_mod_id: ID of the parent mod that requires this dependency (for logging).
+        include_mod_id: Whether to include the mod ID in the filename or not.
     """
     if processed_mods is None:
         processed_mods = set()
@@ -293,7 +337,8 @@ def download_mod(
             if latest_mod:
                 _process_dependencies(
                     latest_mod, modrinth_client, directory, version, loader,
-                    update, existing_mods, stats, failed_mods, processed_mods, mod_id
+                    update, existing_mods, stats, failed_mods, processed_mods, mod_id,
+                    include_mod_id=include_mod_id
                 )
             return
 
@@ -329,7 +374,8 @@ def download_mod(
         
         _process_dependencies(
             latest_mod, modrinth_client, directory, version, loader,
-            update, existing_mods, stats, failed_mods, processed_mods, mod_id
+            update, existing_mods, stats, failed_mods, processed_mods, mod_id,
+            include_mod_id=include_mod_id
         )
 
         # Find primary file
@@ -351,7 +397,8 @@ def download_mod(
 
         filename: str = file_to_download["filename"]
         filename_parts = filename.split(".")
-        filename_parts.insert(-1, mod_id)
+        if include_mod_id:
+            filename_parts.insert(-1, mod_id)
         filename_with_id = ".".join(filename_parts)
         file_path = os.path.join(directory, filename_with_id)
 
@@ -420,6 +467,9 @@ def download_mod(
             failed_mods.append(mod_display)
             return
 
+        # save mod ID to metadata file
+        save_mod_metadata(directory, filename_with_id, mod_id)
+
         # Only remove old file if download succeeded
         if existing_mod:
             old_file_path = os.path.join(directory, existing_mod["filename"])
@@ -470,6 +520,7 @@ def _process_dependencies(
     failed_mods: List[str],
     processed_mods: set,
     parent_mod_id: str,
+    include_mod_id: bool = True,
 ) -> None:
     """Process required dependencies for a mod version.
     
@@ -477,6 +528,7 @@ def _process_dependencies(
     
     Args:
         parent_mod_id: ID of the parent mod that requires these dependencies.
+        include_mod_id: Whether to include the mod ID in the filename or not.
     """
     dependencies = latest_mod.get("dependencies", [])
     required_deps = [
@@ -506,6 +558,7 @@ def _process_dependencies(
             processed_mods,
             is_dependency=True,
             parent_mod_id=parent_mod_id,
+            include_mod_id=include_mod_id,
         )
 
 
@@ -536,7 +589,7 @@ def main():
         return
 
     print(f"Found {len(mods)} mod(s) in collection")
-    existing_mods = get_existing_mods(args.directory)
+    existing_mods = get_existing_mods(args.directory, include_mod_id=args.include_mod_id)
 
     # Statistics tracking
     stats = {
@@ -562,6 +615,7 @@ def main():
                 existing_mods,
                 stats,
                 failed_mods,
+                include_mod_id=args.include_mod_id,
             )
             for mod_id in mods
         ]
@@ -618,7 +672,6 @@ def main():
         for mod in failed_mods:
             print(f"  - {mod}")
     print("=" * 50)
-
 
 if __name__ == "__main__":
     main()

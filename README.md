@@ -83,6 +83,7 @@ options:
                         Directory to download mods to. Default: "./mods"
   -u, --update          Download and update existing mods. Default: true
   --no-update           Do not update existing mods
+  --no-mod-id           Do not include the mod ID in the downloaded filename
 ```
 
 **Note:** All arguments except `-d` are optional. The script will prompt for any missing values.
