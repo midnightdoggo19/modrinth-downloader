@@ -4,9 +4,7 @@ import json
 import os
 from urllib import request, error
 
-
 class ModrinthClient:
-
     def __init__(self):
         self.base_url = "https://api.modrinth.com"
 
@@ -30,9 +28,7 @@ class ModrinthClient:
     def get_collection(self, collection_id):
         return self.get(f"/v3/collection/{collection_id}")
 
-
 modrinth_client = ModrinthClient()
-
 
 def parse_args():
     """Parse command-line arguments."""
@@ -69,13 +65,11 @@ def parse_args():
     )
     return parser.parse_args()
 
-
 args = parse_args()
 
 if args.directory:
     if not os.path.exists(args.directory):
         os.mkdir(args.directory)
-
 
 def get_existing_mods() -> list[dict]:
     file_names = os.listdir(args.directory)
@@ -83,7 +77,6 @@ def get_existing_mods() -> list[dict]:
         {"id": file_name.split(".")[-2], "filename": file_name}
         for file_name in file_names
     ]
-
 
 def get_latest_version(mod_id):
     mod_versions_data = modrinth_client.get_mod_version(mod_id)
@@ -101,7 +94,6 @@ def get_latest_version(mod_id):
         None,
     )
     return mod_version_to_download
-
 
 def download_mod(mod_id, existing_mods=[]):
     try:
@@ -149,7 +141,6 @@ def download_mod(mod_id, existing_mods=[]):
     except Exception as e:
         print(f"Failed to download {mod_id}: {e}")
 
-
 def main():
     collection_details = modrinth_client.get_collection(args.collection)
     if not collection_details:
@@ -161,7 +152,6 @@ def main():
 
     with ThreadPoolExecutor(max_workers=5) as executor:
         executor.map(download_mod, mods, [existing_mods] * len(mods))
-
 
 if __name__ == "__main__":
     main()
